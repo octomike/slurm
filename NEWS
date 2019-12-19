@@ -56,6 +56,8 @@ documents those changes that are of interest to users and administrators.
     than one backfill reservation per job.
  -- Allow sacctmgr to filter node events by states that are flags.
  -- Allow sacctmgr to filter node events by REBOOT state/flag.
+ -- If any component of a HetJob is preemptable all other components of the
+    job inherit the same.
 
 * Changes in Slurm 19.05.6
 ==========================
