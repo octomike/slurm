@@ -900,6 +900,9 @@ uint16_t parse_mail_type(const char *arg)
 	if (!arg)
 		return INFINITE16;
 
+	if (xstrcmp(arg, "") == 0)
+		return 0;
+
 	buf = xstrdup(arg);
 	tok = strtok_r(buf, ",", &save_ptr);
 	while (tok) {
