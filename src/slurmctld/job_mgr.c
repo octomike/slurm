@@ -8035,7 +8035,17 @@ static int _copy_job_desc_to_job_record(job_desc_msg_t *job_desc,
 	job_ptr->derived_ec = 0;
 
 	job_ptr->licenses  = xstrdup(job_desc->licenses);
-	job_ptr->mail_type = job_desc->mail_type;
+	/* This will work for previous versions because they weren't sending
+	 * NO_VAL's. They were sending 0 if not set so it will set 0 here.
+	 * In 20.02, if it not's set on the command line then it will be left at
+	 * 0 because the job_record is xmalloc'ed to 0's.
+	 *
+	 * If someone was modifying mailtype in a jobsubmit plugin then they
+	 * would need to update it so to check for NO_VAL16. This needs to go
+	 * into the RELEASE_NOTES.
+	 */
+	if (job_ptr->mail_type != NO_VAL16)
+		job_ptr->mail_type = job_desc->mail_type;
 	job_ptr->mail_user = xstrdup(job_desc->mail_user);
 	job_ptr->bit_flags = job_desc->bitflags;
 	job_ptr->bit_flags &= ~BACKFILL_TEST;
@@ -13741,7 +13751,7 @@ static int _update_job(job_record_t *job_ptr, job_desc_msg_t *job_specs,
 	 * see slurm_init_job_desc_msg() in scontrol_update_job()
 	 * This will get cleared on a call like:
 	 * scontrol update jobid=1234 timelimit=5:00 */
-	if (job_specs->mail_type) {
+	if (job_specs->mail_type != NO_VAL16) {
 		job_ptr->mail_type = job_specs->mail_type;
 		sched_info("%s: setting mail_type to %u for %pJ",
 			   __func__, job_ptr->mail_type, job_ptr);
