@@ -13737,7 +13737,11 @@ static int _update_job(job_record_t *job_ptr, job_desc_msg_t *job_specs,
 		}
 	}
 
-	if (job_specs->mail_type != INFINITE16) {
+	/* It's not init'ed to INFINIT16
+	 * see slurm_init_job_desc_msg() in scontrol_update_job()
+	 * This will get cleared on a call like:
+	 * scontrol update jobid=1234 timelimit=5:00 */
+	if (job_specs->mail_type) {
 		job_ptr->mail_type = job_specs->mail_type;
 		sched_info("%s: setting mail_type to %u for %pJ",
 			   __func__, job_ptr->mail_type, job_ptr);

@@ -900,8 +900,11 @@ uint16_t parse_mail_type(const char *arg)
 	if (!arg)
 		return INFINITE16;
 
+#if 0
+	This is the same as setting MailType=None
 	if (xstrcmp(arg, "") == 0)
 		return 0;
+#endif
 
 	buf = xstrdup(arg);
 	tok = strtok_r(buf, ",", &save_ptr);
