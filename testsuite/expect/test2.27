@@ -172,11 +172,61 @@ if {$job_id == 0} {
 }
 
 set matches 0
+set mail_user ""
+set mail_type "NONE"
+spawn $scontrol -o show job $job_id
+expect {
+	-re "MailUser= MailType=NONE" {
+		incr matches
+		exp_continue
+	}
+	timeout {
+		log_error "scontrol not responding"
+		end_it 1
+	}
+	eof {
+		wait
+	}
+}
+if {$matches != 1} {
+	log_error "didn't find MailUser=$mail_user MailType=$mail_type"
+	end_it 1
+}
+
+
+set matches 0
+set mail_user "blah"
+set mail_type "BEGIN,END"
 exec $scontrol update JobId=$job_id mailuser=$mail_user mailtype=$mail_type
 exec $scontrol update JobId=$job_id timelimit=2
 spawn $scontrol -o show job $job_id
 expect {
 	-re "MailUser=$mail_user MailType=$mail_type" {
+		incr matches
+		exp_continue
+	}
+	timeout {
+		log_error "scontrol not responding"
+		end_it 1
+	}
+	eof {
+		wait
+	}
+}
+if {$matches != 1} {
+	log_error "didn't find MailUser=$mail_user MailType=$mail_type"
+	end_it 1
+}
+
+
+# Test clearing
+set matches 0
+set mail_user ""
+set mail_type "NONE"
+exec $scontrol update JobId=$job_id mailuser= mailtype=NONE
+spawn $scontrol -o show job $job_id
+expect {
+	-re "MailUser= MailType=NONE" {
 		incr matches
 		exp_continue
 	}
