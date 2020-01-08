@@ -13746,9 +13746,14 @@ static int _update_job(job_record_t *job_ptr, job_desc_msg_t *job_specs,
 
 	if (job_specs->mail_user) {
 		xfree(job_ptr->mail_user);
-		job_ptr->mail_user = xstrdup(job_specs->mail_user);
-		sched_info("%s: setting mail_user to %s for %pJ",
-			   __func__, job_ptr->mail_user, job_ptr);
+		if (!strlen(job_specs->mail_user)) {
+			sched_info("%s: setting mail_user to job's user for %pJ",
+				   __func__, job_ptr);
+		} else {
+			job_ptr->mail_user = xstrdup(job_specs->mail_user);
+			sched_info("%s: setting mail_user to %s for %pJ",
+				   __func__, job_ptr->mail_user, job_ptr);
+		}
 	}
 
 	/*
