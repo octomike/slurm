@@ -66,7 +66,7 @@ proc end_it { exit_code } {
 	exit $exit_code
 }
 
-proc submit { args regex match_cnt } {
+proc submit { args regex } {
 	global sbatch scontrol number
 	set matches 0
 	set jobid 0
@@ -106,15 +106,15 @@ proc submit { args regex match_cnt } {
 		}
 	}
 
-	if {$matches != $match_cnt} {
-		log_error "scontrol show job $jobid failed to match '$regex' $match_cnt times; matched $matches times"
+	if {!$matches} {
+		log_error "scontrol show job $jobid failed to match '$regex'"
 		end_it 1
 	}
 
 	cancel_job $jobid
 }
 
-proc update { job_id args regex match_cnt } {
+proc update { job_id args regex } {
 	global scontrol
 	set matches 0
 
@@ -144,8 +144,8 @@ proc update { job_id args regex match_cnt } {
 		}
 	}
 
-	if {$matches != $match_cnt} {
-		log_error "scontrol update job $args failed to match '$regex' $match_cnt times; matched $matches times"
+	if {!$matches} {
+		log_error "scontrol update job $args failed to match '$regex'"
 		end_it 1
 	}
 }
@@ -159,65 +159,58 @@ copy_conf $config_path $cwd
 if { $exit_code != 0 } {
 	exit $exit_code
 }
-exec $bin_sed -i "s/^\\(MailDomain.*\\)/#\\1/Ig" $config_path/slurm.conf
-reconfigure
 
-submit "-H" "MailUser=\\(null\\) MailType=NONE" 1
-submit "-H --mail-type=begin,end" "MailUser=$user MailType=BEGIN,END" 1
-submit "-H --mail-user=blah" "MailUser=\\(null\\) MailType=NONE" 1
+proc test_it {} {
+	global test_id sbatch job_id number user domain
 
-spawn $sbatch -J "test$test_id" --wrap=hostname -H
-expect {
-	-re "Submitted batch job ($number)" {
-		set job_id $expect_out(1,string)
-		exp_continue
+	set domain_str ""
+	if {$domain != ""} {
+		set domain_str "@$domain"
 	}
-	timeout {
-		log_error "sbatch not responding"
-		end_it 1
+
+	submit "-H" "MailUser=\\(null\\) MailType=NONE"
+	submit "-H --mail-type=begin,end" "MailUser=$user$domain_str MailType=BEGIN,END"
+	submit "-H --mail-user=blah" "MailUser=\\(null\\) MailType=NONE"
+
+	spawn $sbatch -J "test$test_id" --wrap=hostname -H
+	expect {
+		-re "Submitted batch job ($number)" {
+			set job_id $expect_out(1,string)
+			exp_continue
+		}
+		timeout {
+			log_error "sbatch not responding"
+			end_it 1
+		}
+		eof {
+			wait
+		}
 	}
-	eof {
-		wait
-	}
+
+	update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN"
+	update $job_id "mailuser= mailtype=begin,end" "MailUser=$user$domain_str MailType=BEGIN,END"
+	update $job_id "mailtype=begin" "MailUser=$user$domain_str MailType=BEGIN"
+	update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN"
+	update $job_id "mailuser=blah mailtype=none" "MailUser=\\(null\\) MailType=NONE"
+
+	cancel_job $job_id
 }
 
-update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN" 1
-update $job_id "mailuser= mailtype=begin,end" "MailUser=$user MailType=BEGIN,END" 1
-update $job_id "mailtype=begin" "MailUser=$user MailType=BEGIN" 1
-update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN" 1
+# Test w/out MailDomain
+set domain ""
+exec $bin_sed -i "s/^\\(MailDomain.*\\)/#\\1/Ig" $config_path/slurm.conf
+reconfigure
+test_it
 
-cancel_job $job_id
 
+# Test w/ MailDomain
 set domain "blah.com"
 set mail_conf "
 MailDomain = $domain
 "
 exec $bin_echo $mail_conf >> $config_path/slurm.conf
 reconfigure
-
-spawn $sbatch -J "test$test_id" --wrap=hostname -H
-expect {
-	-re "Submitted batch job ($number)" {
-		set job_id $expect_out(1,string)
-		exp_continue
-	}
-	timeout {
-		log_error "sbatch not responding"
-		end_it 1
-	}
-	eof {
-		wait
-	}
-}
-
-submit "-H" "MailUser=\\(null\\) MailType=NONE" 1
-submit "-H --mail-type=begin,end" "MailUser=$user@$domain MailType=BEGIN,END" 1
-submit "-H --mail-user=blah" "MailUser=\\(null\\) MailType=NONE" 1
-
-update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN" 1
-update $job_id "mailuser= mailtype=begin,end" "MailUser=$user@$domain MailType=BEGIN,END" 1
-update $job_id "mailtype=begin" "MailUser=$user@$domain MailType=BEGIN" 1
-update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN" 1
+test_it
 
 end_it 0
 
