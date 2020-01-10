@@ -145,31 +145,9 @@ proc update { job_id args regex match_cnt } {
 	}
 
 	if {$matches != $match_cnt} {
-		log_error "scontrol $args failed to match '$regex' $match_cnt times; matched $matches times"
+		log_error "scontrol update job $args failed to match '$regex' $match_cnt times; matched $matches times"
 		end_it 1
 	}
-}
-
-#
-# Run job to determine what nodes are available
-#
-spawn $sbatch -N$node_cnt -J "test$test_id" -t1 -H --output=/dev/null --wrap="hostname"
-expect {
-	-re "Submitted batch job ($number)" {
-		set job_id $expect_out(1,string)
-		exp_continue
-	}
-	timeout {
-		log_error "sbatch not responding"
-		end_it 1
-	}
-	eof {
-		wait
-	}
-}
-if {$job_id == 0} {
-	log_error "job not submitted"
-	end_it 1
 }
 
 set config_path [get_conf_path]
@@ -188,10 +166,10 @@ submit "-H" "MailUser=\\(null\\) MailType=NONE" 1
 submit "-H --mail-type=begin,end" "MailUser=$user MailType=BEGIN,END" 1
 submit "-H --mail-user=blah" "MailUser=\\(null\\) MailType=NONE" 1
 
-spawn sbatch --wrap=hostname -H
+spawn $sbatch -J "test$test_id" --wrap=hostname -H
 expect {
 	-re "Submitted batch job ($number)" {
-		set jobid $expect_out(1,string)
+		set job_id $expect_out(1,string)
 		exp_continue
 	}
 	timeout {
@@ -208,6 +186,8 @@ update $job_id "mailuser= mailtype=begin,end" "MailUser=$user MailType=BEGIN,END
 update $job_id "mailtype=begin" "MailUser=$user MailType=BEGIN" 1
 update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN" 1
 
+cancel_job $job_id
+
 set domain "blah.com"
 set mail_conf "
 MailDomain = $domain
@@ -215,14 +195,29 @@ MailDomain = $domain
 exec $bin_echo $mail_conf >> $config_path/slurm.conf
 reconfigure
 
+spawn $sbatch -J "test$test_id" --wrap=hostname -H
+expect {
+	-re "Submitted batch job ($number)" {
+		set job_id $expect_out(1,string)
+		exp_continue
+	}
+	timeout {
+		log_error "sbatch not responding"
+		end_it 1
+	}
+	eof {
+		wait
+	}
+}
+
 submit "-H" "MailUser=\\(null\\) MailType=NONE" 1
 submit "-H --mail-type=begin,end" "MailUser=$user@$domain MailType=BEGIN,END" 1
 submit "-H --mail-user=blah" "MailUser=\\(null\\) MailType=NONE" 1
 
-update $job_id "mailuser=blah mailtype=begin" "MailUser=blah@$domain MailType=BEGIN" 1
+update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN" 1
 update $job_id "mailuser= mailtype=begin,end" "MailUser=$user@$domain MailType=BEGIN,END" 1
 update $job_id "mailtype=begin" "MailUser=$user@$domain MailType=BEGIN" 1
-update $job_id "mailuser=blah mailtype=begin" "MailUser=blah@$domain MailType=BEGIN" 1
+update $job_id "mailuser=blah mailtype=begin" "MailUser=blah MailType=BEGIN" 1
 
 end_it 0
 
